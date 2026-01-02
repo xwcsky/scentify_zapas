@@ -1,18 +1,9 @@
-<div id="google-pay-container" class="m-5">
-  @if (ready) {
-    <google-pay-button
-      [buttonRadius]="30"
-      [paymentRequest]="paymentRequest"
-      [paymentAuthorizedCallback]="onPaymentAuthorized"
-      environment="TEST"
-      buttonColor="black"
-      buttonType="pay"
-      buttonBorderType="default_border"
-      buttonLocale="pl"
-      buttonSizeMode="fill"
-      style="width: 240px; height: 60px;"
-    ></google-pay-button>
-  } @else {
-    <p>Ładowanie Google Pay...</p>
-  }
-</div>
+<google-pay-button
+  [paymentRequest]="paymentRequest"
+  [environment]="'TEST'"
+  [buttonColor]="'black'"
+  [buttonType]="'pay'"
+  [buttonLocale]="'pl'"
+  (paymentAuthorized)="onPaymentAuthorized($event)"
+  style="width:240px;height:60px">
+</google-pay-button>
