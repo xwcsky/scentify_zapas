@@ -1,85 +1,44 @@
-import { ChangeDetectorRef, Component, OnInit } from '@angular/core';
-import { GooglePayService } from '../../services/google-pay.service';
-import { switchMap } from 'rxjs/operators';
+import { Component, OnInit } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { GooglePayButtonModule } from '@google-pay/button-angular';
-
-declare const google: any;
+import { GooglePayService } from '../../services/google-pay.service';
+import {ConfigurationService} from '../../../common/services/configuration.service';
 
 @Component({
   selector: 'app-google-pay-button',
   standalone: true,
   imports: [GooglePayButtonModule],
-  templateUrl: './google-pay-button.component.html',
-  styleUrls: ['./google-pay-button.component.scss']
+  templateUrl: './google-pay-button.component.html'
 })
 export class GooglePayButtonComponent implements OnInit {
-  ready = false;
-  paymentRequest!: google.payments.api.PaymentDataRequest;
+  paymentRequest!: any;
+  private readonly API_URL = ConfigurationService.getApiUrl();
 
   constructor(
-    private googlePayService: GooglePayService,
-    private cdr: ChangeDetectorRef
+    private googlePay: GooglePayService,
+    private http: HttpClient
   ) {}
 
-  ngOnInit() {
-    // 🔒 Twój publiczny klucz RSA (DIRECT z Tpay Sandbox)
-    const publicKeyPem = `-----BEGIN PUBLIC KEY-----
-MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDNEPTcj9QdrGOEYV3uJBh+0Vku
-ugnqHEwPYxfsqvOc0kSQQMYyGEHvfkY+ZE/eOcqKks3xf3VE0WllN+8aJRqHXUtN
-T6jVy3Xjj5kC14ldlId3CSzuxlpjCjD3GGry88rFksDU0TXMyLMB4vRWM6aWHlwn
-u85zpT6otlgSNXgBzQIDAQAB
------END PUBLIC KEY-----`;
-
-    // 🧠 Inicjalizacja SDK Google Pay i sprawdzenie dostępności
-    this.googlePayService
-      .init()
-      .pipe(switchMap(() => this.googlePayService.isReadyToPay()))
-      .subscribe({
-        next: (isReady) => {
-          if (isReady) {
-            this.paymentRequest = this.googlePayService.createPaymentRequest(
-              publicKeyPem,
-              '1.00',
-              'PLN'
-            );
-            this.ready = true;
-            console.log('✅ Google Pay ready, paymentRequest:', this.paymentRequest);
-          } else {
-            console.error('❌ Google Pay not available');
-          }
-          this.cdr.detectChanges();
-        },
-        error: (err) => console.error('❌ Google Pay init error:', err)
-      });
+  ngOnInit(): void {
+    this.paymentRequest =
+      this.googlePay.createPaymentRequest('1.00', 'PLN');
   }
 
-  // 🔥 Callback po autoryzacji płatności
-  onPaymentAuthorized: google.payments.api.PaymentAuthorizedHandler = (
-    paymentData: google.payments.api.PaymentData
-  ) => {
-    console.log('✅ Payment authorized:', paymentData);
+  onPaymentAuthorized = (event: any) => {
+    return new Promise((resolve) => {
+      const token =
+        event.paymentMethodData.tokenizationData.token;
 
-    const token = paymentData.paymentMethodData.tokenizationData.token;
-    const amount = this.paymentRequest.transactionInfo.totalPrice;
-    const currency = this.paymentRequest.transactionInfo.currencyCode;
-
-    this.googlePayService.finalizePayment(token, amount, currency).subscribe({
-      next: (res: any) => {
-        if (res.success && res.redirectUrl) {
-          console.log('✅ Backend OK, redirect:', res.redirectUrl);
-          window.location.href = res.redirectUrl;
-        } else {
-          console.error('❌ Payment failed:', res.error);
-          alert('❌ Payment failed: ' + (res.error || 'unknown error'));
-        }
-      },
-      error: (err) => {
-        console.error('❌ Backend error:', err);
-        alert('❌ Backend error: ' + err.message);
-      }
+      this.http.post(`${this.API_URL}//payments/google-pay`, {
+        token,
+        amount: '1.00',
+        currency: 'PLN'
+      }).subscribe({
+        next: () =>
+          resolve({ transactionState: 'SUCCESS' }),
+        error: () =>
+          resolve({ transactionState: 'ERROR' })
+      });
     });
-
-    // ✅ Odpowiedź dla Google Pay (musi być natychmiast)
-    return { transactionState: 'SUCCESS' };
   };
 }
