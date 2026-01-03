@@ -7,6 +7,24 @@ export class PaymentsController {
 
     @Post('pay')
     async pay(@Body() body: { amount: number }) {
-        return this.paymentsService.createTransaction(body.amount);
+        try {
+            const result = await this.paymentsService.createTransaction(body.amount);
+
+            return {
+                ok: true,
+                result
+            };
+
+        } catch (err: any) {
+            return {
+                ok: false,
+                debug: {
+                    payload: err.debugPayload,
+                    sign: err.debugSign,
+                    status: err?.response?.status,
+                    data: err?.response?.data
+                }
+            };
+        }
     }
 }

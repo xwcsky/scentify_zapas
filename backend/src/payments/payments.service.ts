@@ -30,7 +30,7 @@ export class PaymentsService {
     }
 
     async createTransaction(amountPln: number) {
-        const amount = Math.round(amountPln * 100); // grosze
+        const amount = Math.round(amountPln * 100);
         const sessionId = `sess_${Date.now()}`;
 
         const sign = this.generateSign(sessionId, amount, 'PLN');
@@ -50,17 +50,29 @@ export class PaymentsService {
             sign
         };
 
-        const response = await axios.post(
-            `${this.api}/transaction/register`,
-            payload,
-            {
-                auth: {
-                    username: String(this.merchantId),
-                    password: this.reportKey
+        try {
+            const response = await axios.post(
+                `${this.api}/transaction/register`,
+                payload,
+                {
+                    auth: {
+                        username: String(this.merchantId),
+                        password: this.reportKey
+                    }
                 }
-            }
-        );
+            );
 
-        return response.data;
+            return {
+                p24Response: response.data,
+                payload,
+                sign
+            };
+
+        } catch (err: any) {
+            // ⬅️ rzuć dalej, controller to złapie
+            err.debugPayload = payload;
+            err.debugSign = sign;
+            throw err;
+        }
     }
 }
