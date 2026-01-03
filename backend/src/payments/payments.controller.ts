@@ -5,16 +5,8 @@ import { PaymentsService } from './payments.service';
 export class PaymentsController {
     constructor(private readonly paymentsService: PaymentsService) {}
 
-    @Post('google-pay')
-    async googlePay(
-        @Body('token') googlePayToken: string,
-        @Body('amount') amount: string,
-        @Body('currency') currency: string
-    ) {
-        return this.paymentsService.createGooglePayTransaction(
-            googlePayToken,
-            amount,
-            currency
-        );
+    @Post('pay')
+    async pay(@Body() body: { amount: number }) {
+        return this.paymentsService.createTransaction(body.amount);
     }
 }

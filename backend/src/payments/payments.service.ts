@@ -1,46 +1,66 @@
 import { Injectable } from '@nestjs/common';
 import axios from 'axios';
+import crypto from 'crypto';
 
 @Injectable()
 export class PaymentsService {
-    private api = process.env.P24_API!;
-    private login = process.env.P24_LOGIN!;
-    private secretId = process.env.P24_SECRET_ID!;
+    private api = 'https://sandbox.przelewy24.pl/api/v1';
 
-    async createGooglePayTransaction(
-        googlePayToken: string,
-        amount: string,
+    private merchantId = Number(process.env.P24_MERCHANT_ID);
+    private posId = Number(process.env.P24_POS_ID);
+    private crc = process.env.P24_CRC!;
+    private reportKey = process.env.P24_REPORT_KEY!;
+
+    private generateSign(
+        sessionId: string,
+        amount: number,
         currency: string
-    ) {
-        const amountInt = Math.round(parseFloat(amount) * 100);
+    ): string {
+        const data =
+            `{"sessionId":"${sessionId}",` +
+            `"merchantId":${this.merchantId},` +
+            `"amount":${amount},` +
+            `"currency":"${currency}",` +
+            `"crc":"${this.crc}"}`;
+
+        return crypto
+            .createHash('sha384')
+            .update(data, 'utf8')
+            .digest('hex');
+    }
+
+    async createTransaction(amountPln: number) {
+        const amount = Math.round(amountPln * 100); // grosze
+        const sessionId = `sess_${Date.now()}`;
+
+        const sign = this.generateSign(sessionId, amount, 'PLN');
 
         const payload = {
-            amount: amountInt,
-            currency,
-            description: 'Google Pay APay Sandbox',
-            type: 'googlepay',
-
-            cardData: {
-                means: {
-                    xPayPayload: googlePayToken
-                }
-            }
+            merchantId: this.merchantId,
+            posId: this.posId,
+            sessionId,
+            amount,
+            currency: 'PLN',
+            description: 'Test płatności sandbox',
+            email: 'test@test.pl',
+            country: 'PL',
+            language: 'pl',
+            urlReturn: 'https://example.com/return',
+            urlStatus: 'https://example.com/status',
+            sign
         };
 
         const response = await axios.post(
-            `${this.api}/apay/transactions`,
+            `${this.api}/transaction/register`,
             payload,
             {
                 auth: {
-                    username: this.login,
-                    password: this.secretId
+                    username: String(this.merchantId),
+                    password: this.reportKey
                 }
             }
         );
 
-        return {
-            success: true,
-            data: response.data
-        };
+        return response.data;
     }
 }

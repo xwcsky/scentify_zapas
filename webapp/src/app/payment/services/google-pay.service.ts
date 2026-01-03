@@ -34,6 +34,7 @@ export class GooglePayService {
         currencyCode: currency
       },
 
+      // 🔴 WYMAGANE
       callbackIntents: ['PAYMENT_AUTHORIZATION']
     };
   }
