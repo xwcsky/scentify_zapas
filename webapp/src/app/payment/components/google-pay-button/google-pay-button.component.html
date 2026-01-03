@@ -1,9 +1,9 @@
 <google-pay-button
   [paymentRequest]="paymentRequest"
-  [environment]="'TEST'"
-  [buttonColor]="'black'"
-  [buttonType]="'pay'"
-  [buttonLocale]="'pl'"
-  (paymentAuthorized)="onPaymentAuthorized($event)"
+  [paymentAuthorizedCallback]="onPaymentAuthorized"
+  environment="TEST"
+  buttonColor="black"
+  buttonType="pay"
+  buttonLocale="pl"
   style="width:240px;height:60px">
 </google-pay-button>

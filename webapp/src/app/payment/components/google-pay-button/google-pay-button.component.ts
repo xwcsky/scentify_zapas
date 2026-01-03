@@ -12,6 +12,7 @@ import {ConfigurationService} from '../../../common/services/configuration.servi
 })
 export class GooglePayButtonComponent implements OnInit {
   paymentRequest!: any;
+
   private readonly API_URL = ConfigurationService.getApiUrl();
 
   constructor(
@@ -24,21 +25,19 @@ export class GooglePayButtonComponent implements OnInit {
       this.googlePay.createPaymentRequest('1.00', 'PLN');
   }
 
-  onPaymentAuthorized = (event: any) => {
-    return new Promise((resolve) => {
-      const token =
-        event.paymentMethodData.tokenizationData.token;
+  onPaymentAuthorized: google.payments.api.PaymentAuthorizedHandler =
+    () => {
+      return new Promise<google.payments.api.PaymentAuthorizationResult>(
+        (resolve) => {
 
-      this.http.post(`${this.API_URL}//payments/google-pay`, {
-        token,
-        amount: '1.00',
-        currency: 'PLN'
-      }).subscribe({
-        next: () =>
-          resolve({ transactionState: 'SUCCESS' }),
-        error: () =>
-          resolve({ transactionState: 'ERROR' })
-      });
-    });
-  };
+          this.http.post(`${this.API_URL}/payments/google-pay`, { amount: 10 })
+            .subscribe({
+              next: () =>
+                resolve({ transactionState: 'SUCCESS' }),
+              error: () =>
+                resolve({ transactionState: 'ERROR' })
+            });
+        }
+      );
+    };
 }
