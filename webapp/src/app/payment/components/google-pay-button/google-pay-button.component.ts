@@ -30,7 +30,10 @@ export class GooglePayButtonComponent implements OnInit {
       return new Promise<google.payments.api.PaymentAuthorizationResult>(
         (resolve) => {
 
-          this.http.post(`${this.API_URL}/payments/google-pay`, { amount: 10 })
+          // this.http.post('/api/payments/pay', { amount: 10 }).subscribe(res => {
+          //   window.location.href = res.redirectUrl;
+          // });
+          this.http.post(`${this.API_URL}/payments/pay`, { amount: 10 })
             .subscribe({
               next: () =>
                 resolve({ transactionState: 'SUCCESS' }),
