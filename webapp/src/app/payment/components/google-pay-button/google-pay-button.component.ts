@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { GooglePayButtonModule } from '@google-pay/button-angular';
 import { GooglePayService } from '../../services/google-pay.service';
 import {ConfigurationService} from '../../../common/services/configuration.service';
+import {Router} from '@angular/router';
 
 @Component({
   selector: 'app-google-pay-button',
@@ -17,7 +18,8 @@ export class GooglePayButtonComponent implements OnInit {
 
   constructor(
     private googlePay: GooglePayService,
-    private http: HttpClient
+    private http: HttpClient,
+    private router: Router
   ) {}
 
   ngOnInit(): void {
@@ -29,16 +31,16 @@ export class GooglePayButtonComponent implements OnInit {
     () => {
       return new Promise<google.payments.api.PaymentAuthorizationResult>(
         (resolve) => {
-
-          // this.http.post('/api/payments/pay', { amount: 10 }).subscribe(res => {
-          //   window.location.href = res.redirectUrl;
-          // });
           this.http.post(`${this.API_URL}/payments/pay`, { amount: 10 })
             .subscribe({
-              next: () =>
-                resolve({ transactionState: 'SUCCESS' }),
-              error: () =>
-                resolve({ transactionState: 'ERROR' })
+              next: () => {
+                resolve({ transactionState: 'SUCCESS' });
+                this.router.navigate(['payment/confirm']);
+              },
+              error: () => {
+                resolve({ transactionState: 'ERROR' });
+                this.router.navigate(['payment/error']);
+              }
             });
         }
       );
