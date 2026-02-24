@@ -1,4 +1,4 @@
-import {AfterViewInit, ChangeDetectorRef, Component, EventEmitter, OnDestroy, OnInit, Output} from '@angular/core';
+import {AfterViewInit, ChangeDetectorRef, Component, EventEmitter, OnDestroy, OnInit, Output, Input} from '@angular/core';
 import { Subject, takeUntil } from 'rxjs';
 import { ColognesApiService } from '../../services/colognes-api.service';
 import { Cologne } from '../../../common/model/interfaces';
@@ -16,6 +16,7 @@ import Swiper from 'swiper';
   styleUrl: './colognes-list.component.scss'
 })
 export class ColognesListComponent implements AfterViewInit, OnDestroy {
+  @Input() deviceId!: string;
   @Output() selectedCologne: EventEmitter<string | undefined> = new EventEmitter();
   colognes: Cologne[] | undefined;
 
@@ -42,15 +43,28 @@ export class ColognesListComponent implements AfterViewInit, OnDestroy {
   }
 
   private loadColognes(): void {
-    this.colognesApiService.getColognes()
+    if (!this.deviceId) return;
+
+    this.colognesApiService.getDeviceWithSlots(this.deviceId)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: colognes => {
-          this.colognes = colognes;
-          console.log(colognes);
+        next: (device) => {
+          const mappedColognes = device.slots.map((slot: any) => ({
+            id: slot.cologne.id,
+            brandName: slot.cologne.brand_name,
+            cologneName: slot.cologne.cologne_name,
+            imageUrl: slot.cologne.image_url
+          }));
+          
+          this.colognes = mappedColognes;
+          console.log(`📦 Załadowano perfumy dla kiosku ${this.deviceId}:`, this.colognes);
+          
           this.cdr.detectChanges();
           setTimeout(() => this.initSwiper(), 0);
         },
+        error: (err) => {
+          console.error('Błąd pobierania slotów urządzenia:', err);
+        }
       });
   }
 

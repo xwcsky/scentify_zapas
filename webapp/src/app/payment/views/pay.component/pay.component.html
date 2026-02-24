@@ -1,12 +1,44 @@
-<div class="d-flex flex-column justify-content-center align-items-center min-vh-100">
+<div class="d-flex flex-column justify-content-center align-items-center min-vh-100 pay-container">
   <h1 class="mb-5 text-center">Wybierz sposób płatności</h1>
-  @if (system === OSType.iOS) {
-    <app-apple-pay-button></app-apple-pay-button>
-  } @else if (system === OSType.Android) {
-    <app-google-pay-button></app-google-pay-button>
+
+  @if (!isLoading && finalPrice !== 'Wczytywanie...') {
+    
+    <div class="mb-4 text-center">
+       <h3>Do zapłaty: {{ finalPrice }} PLN</h3>
+    </div>
+
+    @if (system === OSType.iOS) {
+      
+      <app-apple-pay-button (click)="initiateP24Payment()">
+      </app-apple-pay-button>
+
+    } @else if (system === OSType.Android) {
+      
+      <app-google-pay-button 
+        [price]="finalPrice"
+        (paymentSuccess)="onGooglePaySuccess($event)"> 
+      </app-google-pay-button>
+
+    } @else {
+      <div class="desktop-options">
+        <app-apple-pay-button (click)="initiateP24Payment()"></app-apple-pay-button>
+        
+        <div class="mt-3"></div> <app-google-pay-button
+          [price]="finalPrice"
+          (paymentSuccess)="onGooglePaySuccess($event)"> 
+        </app-google-pay-button>
+      </div>
+
+    }
+
+    <button class="btn btn-warning mt-4 font-weight-bold" (click)="initiateP24Payment()" style="width: 100%; max-width: 300px; padding: 12px;">
+      Zapłać BLIK / Przelewem
+    </button>
+
   } @else {
-    <app-apple-pay-button></app-apple-pay-button>
-    <app-google-pay-button></app-google-pay-button>
+    <div class="text-center">
+      <div class="spinner-border text-primary" role="status"></div>
+      <p class="mt-2">Ładowanie danych płatności...</p>
+    </div>
   }
 </div>
-

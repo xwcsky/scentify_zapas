@@ -1,48 +1,62 @@
-import { Component, OnInit } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { GooglePayButtonModule } from '@google-pay/button-angular';
+import { Component, EventEmitter, Input, OnInit, Output, OnChanges, SimpleChanges } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { GooglePayButtonModule } from '@google-pay/button-angular'; // 👈 IMPORT BIBLIOTEKI
 import { GooglePayService } from '../../services/google-pay.service';
-import {ConfigurationService} from '../../../common/services/configuration.service';
-import {Router} from '@angular/router';
 
 @Component({
   selector: 'app-google-pay-button',
   standalone: true,
-  imports: [GooglePayButtonModule],
-  templateUrl: './google-pay-button.component.html'
+  imports: [CommonModule, GooglePayButtonModule], // 👈 MUSI TU BYĆ
+  templateUrl: './google-pay-button.component.html',
+  styleUrls: ['./google-pay-button.component.scss']
 })
 export class GooglePayButtonComponent implements OnInit {
-  paymentRequest!: any;
+  @Input() price: string = '0.00';
+  
+  // Wysyłamy token do rodzica
+  @Output() paymentSuccess = new EventEmitter<string>(); 
+  @Output() paymentError = new EventEmitter<any>();
 
-  private readonly API_URL = ConfigurationService.getApiUrl();
+  // Obiekt konfiguracyjny dla guzika
+  paymentRequest!: google.payments.api.PaymentDataRequest;
 
-  constructor(
-    private googlePay: GooglePayService,
-    private http: HttpClient,
-    private router: Router
-  ) {}
+  constructor(private googlePayService: GooglePayService) {}
 
   ngOnInit(): void {
-    this.paymentRequest =
-      this.googlePay.createPaymentRequest('1.00', 'PLN');
+    // Tworzymy konfigurację na starcie
+    this.updatePaymentRequest();
   }
 
-  onPaymentAuthorized: google.payments.api.PaymentAuthorizedHandler =
-    () => {
-      return new Promise<google.payments.api.PaymentAuthorizationResult>(
-        (resolve) => {
-          this.http.post(`${this.API_URL}/payments/pay`, { amount: 10 })
-            .subscribe({
-              next: () => {
-                resolve({ transactionState: 'SUCCESS' });
-                this.router.navigate(['payment/confirm']);
-              },
-              error: () => {
-                resolve({ transactionState: 'ERROR' });
-                this.router.navigate(['payment/error']);
-              }
-            });
-        }
-      );
-    };
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['price']) {
+      console.log('💰 Cena zaktualizowana:', this.price);
+      this.updatePaymentRequest();
+    }
+  }
+
+  private updatePaymentRequest() {
+    this.paymentRequest = this.googlePayService.createPaymentRequest(this.price);
+  }
+
+  // Ta metoda uruchomi się automatycznie, gdy Google zwróci dane
+  onLoadPaymentData(event: any) {
+    console.log('📦 Google Pay Data received:', event);
+
+    // 👇 POPRAWKA: Obsługa sytuacji, gdy dane są w 'event.detail'
+    const paymentData = event.detail || event;
+
+    if (paymentData && paymentData.paymentMethodData) {
+      const token = paymentData.paymentMethodData.tokenizationData.token;
+      console.log('🔑 Token extracted:', token);
+      this.paymentSuccess.emit(token);
+    } else {
+      console.error('❌ Błąd struktury danych Google Pay. Otrzymano:', event);
+      this.paymentError.emit(new Error('Invalid payment data structure'));
+    }
+  }
+
+  onError(event: any) {
+    console.error('Google Pay Error:', event);
+    this.paymentError.emit(event);
+  }
 }

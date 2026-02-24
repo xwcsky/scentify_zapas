@@ -1,31 +1,105 @@
 <div class="p-5 bg-light min-vh-100">
+  
+  
   <header class="d-flex justify-content-between">
-    <h1>{{ !payConfirmed ? 'Wybierz zapach' : 'Zapłać' }}</h1>
+    <h1>{{ dispensing ? 'Gotowe!' : (!payConfirmed ? 'Wybierz zapach' : 'Zapłać') }}</h1>
     <button (click)="logout()">Logout</button>
   </header>
 
-  @if (!payConfirmed) {
-    <div>
-      <app-colognes-list (selectedCologne)="setCologneId($event)"></app-colognes-list>
+  @if (dispensing) {
+    <div class="overlay-fullscreen">
+      <div class="d-flex flex-column justify-content-center align-items-center text-center content-box">
+        <div class="display-1 text-success mb-4">✨</div>
+        <h1 class="display-3 text-success fw-bold">Dziękujemy!</h1>
+        <p class="lead fs-2 mt-4 text-white">Zapach jest uwalniany...</p>
+        <div class="spinner-grow text-success mt-4" style="width: 3rem; height: 3rem;" role="status"></div>
+      </div>
     </div>
-    @if (cologneId) {
-      <footer class="d-flex justify-content-center align-items-center mt-5">
-        <button (click)="confirmPayment()" class="w-50 p-4 rounded-4">
-          <span>Zapłać</span>
-        </button>
-      </footer>
+  }
+  
+  @else {
+
+    <app-breadcrumbs 
+      [showPaymentStep]="payConfirmed" (breadcrumbClick)="onBreadcrumbClick($event)">
+    </app-breadcrumbs>
+
+    @if (!payConfirmed) {
+      <div>
+        <app-colognes-list [deviceId]="deviceId" (selectedCologne)="setCologneId($event)"></app-colognes-list>
+      </div>
+      @if (cologneId) {
+        <footer class="d-flex justify-content-center align-items-center mt-5">
+          <button (click)="confirmPayment()" class="w-50 p-4 rounded-4">
+            <span>Zapłać</span>
+          </button>
+        </footer>
+      }
+    } @else {
+      <div class="d-flex flex-column justify-content-center align-items-center mt-5">
+        
+        <div class="discount-box mb-4 d-flex gap-2 w-75">
+          <input 
+            type="text"
+            placeholder="Kod rabatowy"
+            [(ngModel)]="discountCode"
+            class="form-control"
+          />
+          <button (click)="applyDiscount()" class="btn btn-primary">
+            Zastosuj
+          </button>
+        </div>
+      
+        <div *ngIf="discountPercent > 0" class="text-success mb-3">
+          Zastosowano rabat: {{ discountPercent }}%
+        </div>
+      
+        <p class="caption">Zeskanuj kod, aby zapłacić</p>
+
+        <div *ngIf="qrReady" class="text-center">
+          
+          <qrcode
+            [qrdata]="qrData"
+            [width]="250"
+            [margin]="2"
+            [errorCorrectionLevel]="'M'">
+          </qrcode>
+
+          <div class="mt-3 mb-3">
+            <p class="small text-muted mb-1">Ile porcji zapachu?</p>
+            
+            <div class="d-flex justify-content-center align-items-center gap-2">
+              
+              <button (click)="decreaseQuantity()" class="btn btn-outline-secondary btn-sm" [disabled]="quantity <= 1">
+                -
+              </button>
+              
+              <span class="fs-5 fw-bold mx-2" style="min-width: 30px;">{{ quantity }}</span>
+              
+              <button (click)="increaseQuantity()" class="btn btn-outline-primary btn-sm" [disabled]="quantity >= 5">
+                +
+              </button>
+            </div>
+          </div>
+
+          <div *ngIf="discountPercent === 100" class="mt-4 text-center">
+             <div class="alert alert-success">
+                <strong>Kod VIP aktywny!</strong><br>
+                Cena: 0.00 PLN
+             </div>
+             <button (click)="adminFreeDispense()" class="btn btn-success btn-lg pulse-animation">
+                🚀 URUCHOM (BEZ PŁACENIA)
+             </button>
+          </div>
+        
+          <div class="alert alert-info mt-3 py-2">
+            <p class="mb-1"><small>🛠 Tryb developerski:</small></p>
+            <a [href]="qrData" target="_blank" class="btn btn-outline-primary btn-sm">
+                📲 Kliknij, by otworzyć "Telefon Klienta"
+            </a>
+          </div>
+          
+        </div>
+      </div>
     }
-  } @else {
-    <div class="d-flex flex-column justify-content-center align-items-center mt-5">
-      <qrcode
-        [qrdata]="ConfigurationService.getHostUrl() + '/payment'"
-        [width]="250"
-        [margin]="2"
-        [errorCorrectionLevel]="'M'"
-        [colorDark]="'#000000'"
-        [colorLight]="'#ffffff'">
-      </qrcode>
-      <p class="caption">Zeskanuj kod, aby zapłacić</p>
-    </div>
   }
 </div>

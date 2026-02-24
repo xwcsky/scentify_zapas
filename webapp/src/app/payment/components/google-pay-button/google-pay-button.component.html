@@ -1,9 +1,10 @@
-<google-pay-button
-  [paymentRequest]="paymentRequest"
-  [paymentAuthorizedCallback]="onPaymentAuthorized"
-  environment="TEST"
-  buttonColor="black"
-  buttonType="pay"
-  buttonLocale="pl"
-  style="width:240px;height:60px">
-</google-pay-button>
+<div class="gpay-wrapper">
+  <google-pay-button
+    environment="TEST"
+    buttonColor="black"
+    buttonType="buy"
+    [paymentRequest]="paymentRequest"
+    (loadpaymentdata)="onLoadPaymentData($event)"
+    (error)="onError($event)">
+  </google-pay-button>
+</div>
