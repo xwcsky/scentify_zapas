@@ -6,20 +6,6 @@ import { CreateCologneDto } from './dto/create-cologne.dto';
 export class ColognesService {
     constructor(private prisma: PrismaService) {}
 
-    async findAll() {
-        const rows = await this.prisma.colognes.findMany({
-            orderBy: { cologne_name: 'desc' }, // sortowanie od najnowszych
-        });
-
-        // Mapowanie z snake_case (DB) na camelCase (API)
-        return rows.map(row => ({
-            id: row.id,
-            brandName: row.brand_name,
-            cologneName: row.cologne_name,
-            imageUrl: row.image_url
-        }));
-    }
-
     // Tworzy nowe zamówienie
     async create(dto: CreateCologneDto) {
         const row = await this.prisma.colognes.create({

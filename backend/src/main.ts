@@ -28,7 +28,6 @@ async function bootstrap() {
 
     try {
         const response = await axios.get('https://api.ipify.org?format=json');
-        console.log('🔥🔥🔥 MOJE IP SERWERA TO:', response.data.ip, '🔥🔥🔥');
       } catch (e) {
         console.error('Nie udało się pobrać IP serwera', e.message);
       }
