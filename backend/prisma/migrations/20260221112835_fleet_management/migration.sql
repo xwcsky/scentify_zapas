@@ -40,7 +40,7 @@ CREATE TABLE "device_slots" (
 );
 
 -- CreateTable
-CREATE TABLE "DiscountCode" (
+CREATE TABLE "discount_code" (
     "id" TEXT NOT NULL,
     "code" TEXT NOT NULL,
     "percent" INTEGER NOT NULL,
@@ -49,14 +49,14 @@ CREATE TABLE "DiscountCode" (
     "active" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT "DiscountCode_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "discount_code_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
 CREATE UNIQUE INDEX "device_slots_device_id_slot_number_key" ON "device_slots"("device_id", "slot_number");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "DiscountCode_code_key" ON "DiscountCode"("code");
+CREATE UNIQUE INDEX "discount_code_code_key" ON "discount_code"("code");
 
 -- AddForeignKey
 ALTER TABLE "orders" ADD CONSTRAINT "orders_device_id_fkey" FOREIGN KEY ("device_id") REFERENCES "devices"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
