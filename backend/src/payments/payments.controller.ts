@@ -50,7 +50,8 @@ export class PaymentsController {
     
     return { 
       status: 'PAID',
-      success: true
+      success: true,
+      token: p24Token,
      };
   }
 
