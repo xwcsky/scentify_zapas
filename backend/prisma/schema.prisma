@@ -5,44 +5,87 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url      = "postgresql://postgres:cKJFLthYWMWMLXbvcyBZJCAdjygVwFkm@trolley.proxy.rlwy.net:20570/railway"
 }
 
 model Colognes {
-  id           String           @id @default(uuid())
+  id           String       @id @default(uuid())
   cologne_name String
-  brand_name   String           @default("unknown")
-  orders       Orders[]
+  brand_name   String       @default("unknown")
   image_url    String?
+  
+  orders       Orders[]
+  slots        DeviceSlot[] // Relacja do slotów w maszynach
+  
   @@map("colognes")
 }
 
 model Orders {
-  id            String          @id @default(uuid())
-  scent_id      String
-  device_id     String
-  creation_date DateTime        @default(now())
-  cologne       Colognes        @relation(fields: [scent_id], references: [id])
+  id             String   @id @default(uuid())
+  scent_id       String
+  device_id      String   // ID maszyny (teraz spięte z modelem Devices)
+  status         String   @default("PENDING") 
+  quantity       Int      @default(1)         
+  amount         Decimal  @default(0.00)      
+  transaction_id String?                      
+  creation_date  DateTime @default(now())
+  
+  cologne        Colognes @relation(fields: [scent_id], references: [id])
+  device         Devices  @relation(fields: [device_id], references: [id])
+
   @@map("orders")
 }
 
 model Users {
-  id            Int             @id @default(autoincrement())
-  user_name     String @unique
-  password      String
-  role          Role            @default(CLIENT)
-  device        Devices?        @relation(fields: [deviceId], references: [id])
-  deviceId      Int?            @unique
+  id        Int      @id @default(autoincrement())
+  user_name String   @unique
+  password  String
+  role      Role     @default(CLIENT)
+  
+  deviceId  String?  @unique // Zmienione na String? aby pasowało do Devices.id
+  device    Devices? @relation(fields: [deviceId], references: [id])
+  
   @@map("user")
 }
 
 model Devices {
-  id          Int               @id @default(autoincrement())
-  name        String
-  location    String?
-  scentSlots  Json
-  user        Users?
+  id        String       @id // ID w stylu "test-device-01"
+  name      String
+  location  String?
+  status    String       @default("OFFLINE") // Monitorowanie
+  lastSeen  DateTime     @default(now())     // Kiedy ostatnio bito brawo (heartbeat)
+  
+  user      Users?
+  slots     DeviceSlot[] // Maszyna ma wiele slotów
+  orders    Orders[]     // Maszyna ma wiele zamówień
+
   @@map("devices")
+}
+
+model DeviceSlot {
+  id          Int      @id @default(autoincrement())
+  device_id   String
+  slot_number Int      // Fizyczny numer gniazda (np. 1 lub 2)
+  cologne_id  String
+  capacity_ml Int      @default(1000) // Pojemność butelki
+  current_ml  Float    @default(1000) // Obecna ilość płynu
+
+  device      Devices  @relation(fields: [device_id], references: [id])
+  cologne     Colognes @relation(fields: [cologne_id], references: [id])
+
+  // W danej maszynie numer slotu musi być unikalny (nie może być dwóch "jedynek")
+  @@unique([device_id, slot_number]) 
+  @@map("device_slots")
+}
+
+model DiscountCode {
+  id        String   @id @default(uuid())
+  code      String   @unique          
+  percent   Int      
+  maxUsages Int      @default(1)         
+  usedCount Int      @default(0)         
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
 }
 
 enum Role {

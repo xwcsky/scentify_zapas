@@ -1,43 +1,172 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { EventsGateway } from 'src/events/events.gateway';
+import { DiscountsService } from 'src/discounts/discounts.service';
 
 @Injectable()
 export class OrdersService {
-    constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private eventsGateway: EventsGateway, 
+    private discountsService: DiscountsService,
+  ) {}
 
-    // Pobiera wszystkie zamówienia
-    async findAll() {
-        const rows = await this.prisma.orders.findMany({
-            orderBy: { creation_date: 'desc' }, // sortowanie od najnowszych
-        });
+  // Pobiera wszystkie zamówienia
+  async findAll() {
+    const rows = await this.prisma.orders.findMany({
+      orderBy: { creation_date: 'desc' },
+      include: { cologne: true }, 
+    });
 
-        // Mapowanie z snake_case (DB) na camelCase (API)
-        return rows.map(row => ({
-            id: row.id,
-            scentId: row.scent_id,
-            deviceId: row.device_id,
-            creationDate: row.creation_date,
-        }));
+    return rows.map((row) => ({
+      id: row.id,
+      scentId: row.scent_id,
+      deviceId: row.device_id,
+      status: row.status,
+      quantity: row.quantity,
+      amount: row.amount,
+      creationDate: row.creation_date,
+      cologneName: row.cologne?.cologne_name, 
+    }));
+  }
+
+  // Tworzenie zamówienia (Status: PENDING)
+  async create(dto: CreateOrderDto & { discountCode?: string }) {
+    console.log('Tworzę zamówienie:', dto);
+
+    let quantity = dto.quantity || 1;
+    let unitPrice = 5.00; 
+    let finalAmount = unitPrice * quantity; 
+
+    // --- LOGIKA RABATU ---
+    if (dto.discountCode) {
+      try {
+        const validCode = await this.discountsService.validateCode(dto.discountCode);
+        const discountVal = (finalAmount * validCode.percent) / 100;
+        finalAmount = Number((finalAmount - discountVal).toFixed(2));        
+        if (finalAmount < 0) finalAmount = 0;
+        
+        console.log(`Zastosowano kod: ${dto.discountCode} (-${validCode.percent}%). Nowa cena: ${finalAmount}`);
+        
+        // Zużyj kod jeśli 100% zniżki
+        if (finalAmount === 0) {
+             await this.discountsService.consumeCode(dto.discountCode);
+        }
+      } catch (e) {
+        console.error('Błąd rabatu (ignoruję):', e.message);
+      }
     }
 
-    // Tworzy nowe zamówienie
-    async create(dto: CreateOrderDto) {
-        console.log('Tworzę zamówienie z DTO:', dto);
+    // 1. Zapis do bazy
+    const order = await this.prisma.orders.create({
+      data: {
+        scent_id: dto.scentId,
+        device_id: dto.deviceId,
+        quantity: dto.quantity || 1, 
+        status: finalAmount === 0 ? 'PAID' : 'PENDING', // Jak za darmo, to od razu PAID
+        amount: finalAmount, 
+      },
+    });
 
-        const row = await this.prisma.orders.create({
-            data: {
-                scent_id: dto.scentId,
-                device_id: dto.deviceId,
-            },
-        });
+    console.log(`Zamówienie ${order.id} utworzone. Czekam na płatność...`);
 
-        return {
-            id: row.id,
-            scentId: row.scent_id,
-            deviceId: row.device_id,
-            creationDate: row.creation_date,
-        };
+    if (finalAmount === 0) {
+      console.log('Zamówienie darmowe (Admin/VIP). Uruchamiam maszynę!');
+      this.eventsGateway.sendToDevice(order.device_id, 'START_PUMP', {
+         scentId: order.scent_id,
+         quantity: order.quantity,
+      });
+      // Nie czekamy na Google Pay, bo cena to 0
+   }
+
+    return {
+      id: order.id,
+      status: order.status,
+      amount: finalAmount,
+      // Zwracamy to, co potrzebne frontendowi do płatności
+    };
+  }
+
+  
+
+  // DODAJ TĘ FUNKCJĘ W PLIKU orders.service.ts
+  async deductLiquidFromDevice(orderId: string) {
+    // 1. Pobieramy zamówienie, żeby wiedzieć CO i GDZIE klient kupił
+    const order = await this.prisma.orders.findUnique({
+      where: { id: orderId }
+    });
+
+    if (!order) return;
+
+    // 2. Szukamy odpowiedniego slotu w maszynie
+    const slot = await this.prisma.deviceSlot.findFirst({
+      where: {
+        device_id: order.device_id, // W tej maszynie...
+        cologne_id: order.scent_id  // ...szukamy tego zapachu
+      }
+    });
+
+    if (slot) {
+      // 3. Obliczamy zużycie (Zakładamy np. 1 ml na 1 "psik" / quantity)
+      // Możesz to zmienić na np. 0.5 jeśli maszyna zużywa mniej
+      const usagePerSpray = 1.0; 
+      const mlToSubtract = order.quantity * usagePerSpray;
+
+      // 4. Aktualizujemy bazę (nie pozwalamy, by poziom spadł poniżej 0)
+      const newLevel = Math.max(0, slot.current_ml - mlToSubtract);
+
+      await this.prisma.deviceSlot.update({
+        where: { id: slot.id },
+        data: { current_ml: newLevel }
+      });
+
+      console.log(`💧 Zaktualizowano inwentarz! Maszyna: ${order.device_id} | Slot: ${slot.slot_number} | Zostało: ${newLevel}ml`);
+    } else {
+      console.error(`⚠️ UWAGA: Nie znaleziono zapachu (ID: ${order.scent_id}) w maszynie (${order.device_id})!`);
+    }
+  }
+
+  // Metoda wywoływana przez Webhook płatności (lub symulator)
+  async confirmPayment(orderId: string, transactionId?: string, paidAmount?: string | number) {
+    console.log(`Potwierdzam płatność dla zamówienia: ${orderId}`);
+
+    // 1. Znajdź zamówienie
+    const order = await this.prisma.orders.findUnique({
+      where: { id: orderId },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Zamówienie nie istnieje');
     }
 
+    if (order.status === 'PAID') {
+      console.log('To zamówienie jest już opłacone.');
+      return order;
+    }
+
+    // 2. Zaktualizuj status w bazie
+    const updatedOrder = await this.prisma.orders.update({
+      where: { id: orderId },
+      data: {
+        status: 'PAID',
+        transaction_id: transactionId || 'SIMULATED',
+        amount: paidAmount ? paidAmount : undefined,
+      },
+    });
+
+    await this.deductLiquidFromDevice(orderId);
+    
+    this.eventsGateway.sendToDevice(order.device_id, 'START_PUMP', {
+      scentId: order.scent_id,
+      quantity: order.quantity,
+    });
+
+    // 4. Powiadom Frontend (że sukces)
+    this.eventsGateway.notifyOrderUpdate(order.id, 'PAID');
+
+    console.log(`--> ROZKAZ WYSŁANY do urządzenia ${order.device_id} (Zapach: ${order.scent_id}, Ilość: ${order.quantity})`);
+
+    return updatedOrder;
+  }
 }

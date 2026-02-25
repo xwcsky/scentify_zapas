@@ -1,78 +1,35 @@
-import { Injectable } from '@nestjs/common';
-import axios from 'axios';
-import crypto from 'crypto';
+import { Injectable, Logger } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
+import { EventsGateway } from '../events/events.gateway';
 
 @Injectable()
 export class PaymentsService {
-    private api = 'https://sandbox.przelewy24.pl/api/v1';
+  private logger = new Logger(PaymentsService.name);
 
-    private merchantId = Number(process.env.P24_MERCHANT_ID);
-    private posId = Number(process.env.P24_POS_ID);
-    private crc = process.env.P24_CRC!;
-    private reportKey = process.env.P24_REPORT_KEY!;
+  constructor(
+    private prisma: PrismaService,
+    private eventsGateway: EventsGateway
+  ) {}
 
-    private generateSign(
-        sessionId: string,
-        amount: number,
-        currency: string
-    ): string {
-        const data =
-            `{"sessionId":"${sessionId}",` +
-            `"merchantId":${this.merchantId},` +
-            `"amount":${amount},` +
-            `"currency":"${currency}",` +
-            `"crc":"${this.crc}"}`;
+  async markAsPaid(orderId: string, transactionId?: string) {
+    this.logger.log(`💰 Potwierdzono płatność dla zamówienia: ${orderId}`);
 
-        return crypto
-            .createHash('sha384')
-            .update(data, 'utf8')
-            .digest('hex');
+    try {
+        const updatedOrder = await this.prisma.orders.update({
+          where: { id: orderId },
+          data: { 
+              status: 'PAID',
+              transaction_id: transactionId || `P24_${Date.now()}`
+          }
+        });
+
+        // 👇 POPRAWKA: Przekazujemy sam string 'PAID', a nie obiekt
+        this.eventsGateway.notifyOrderUpdate(orderId, 'PAID');
+
+        return updatedOrder;
+    } catch (e) {
+        this.logger.error(`Nie udało się oznaczyć zamówienia ${orderId} jako opłacone`, e);
+        throw e;
     }
-
-    async createTransaction(amountPln: number) {
-        const amount = Math.round(amountPln * 100);
-        const sessionId = `sess_${Date.now()}`;
-
-        const sign = this.generateSign(sessionId, amount, 'PLN');
-
-        const payload = {
-            merchantId: this.merchantId,
-            posId: this.posId,
-            sessionId,
-            amount,
-            currency: 'PLN',
-            description: 'Test płatności sandbox',
-            email: 'test@test.pl',
-            country: 'PL',
-            language: 'pl',
-            urlReturn: 'https://example.com/return',
-            urlStatus: 'https://example.com/status',
-            sign
-        };
-
-        try {
-            const response = await axios.post(
-                `${this.api}/transaction/register`,
-                payload,
-                {
-                    auth: {
-                        username: String(this.merchantId),
-                        password: this.reportKey
-                    }
-                }
-            );
-
-            return {
-                p24Response: response.data,
-                payload,
-                sign
-            };
-
-        } catch (err: any) {
-            // ⬅️ rzuć dalej, controller to złapie
-            err.debugPayload = payload;
-            err.debugSign = sign;
-            throw err;
-        }
-    }
+  }
 }

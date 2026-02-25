@@ -3,6 +3,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import * as bodyParser from 'body-parser';
+import axios from 'axios';
 
 async function bootstrap() {
     const app = await NestFactory.create(AppModule);
@@ -25,6 +26,11 @@ async function bootstrap() {
         next();
     });
 
+    try {
+        const response = await axios.get('https://api.ipify.org?format=json');
+      } catch (e) {
+        console.error('Nie udało się pobrać IP serwera', e.message);
+      }
     // 🔹 CORS
     app.enableCors({
         origin: [

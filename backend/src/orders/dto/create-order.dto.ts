@@ -1,9 +1,19 @@
-import { IsString } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsNotEmpty } from 'class-validator';
 
 export class CreateOrderDto {
-    @IsString()
-    scentId: string;
+  @IsString()
+  @IsNotEmpty()
+  scentId: string;
 
-    @IsString()
-    deviceId: string;
+  @IsString()
+  @IsNotEmpty()
+  deviceId: string;
+
+  @IsOptional()
+  @IsString()
+  discountCode?: string;
+
+  @IsNumber()
+  @IsNotEmpty()
+  quantity: number;
 }

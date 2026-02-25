@@ -23,4 +23,14 @@ export class ColognesApiService {
     const headers = new HttpHeaders().set('Authorization', `Bearer ${token}`);
     return this.http.get<Cologne[]>(`${this.API_URL}/colognes`, { headers });
   }
+
+  getDeviceWithSlots(deviceId: string): Observable<any> {
+    const token = this.authService.getToken();
+    const headers = new HttpHeaders().set('Authorization', `Bearer ${token}`);
+    return this.http.get<any>(`${this.API_URL}/devices/${deviceId}`, { headers });
+  }
+
+  validateDiscount(code: string) {
+    return this.http.post<any>(`${this.API_URL}/discounts/check`, { code });
+  }
 }

@@ -1,0 +1,60 @@
+import { Injectable } from '@angular/core';
+import { io, Socket } from 'socket.io-client';
+import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment';
+import { ConfigurationService } from './configuration.service';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class SocketService {
+  private socket: Socket;
+
+  constructor() {
+    // Łączymy się z backendem (adres z environment lub na sztywno localhost:8080)
+    // Jeśli w environment.ts masz apiUrl, użyj go. Jeśli nie, wpisz adres ręcznie.
+    const url = ConfigurationService.getApiUrl() || 'http://localhost:8080';
+    this.socket = io(url);
+  }
+
+  // Metoda do dołączenia do pokoju zamówienia (nasłuchiwanie konkretnej transakcji)
+  joinOrderRoom(orderId: string) {
+    this.socket.emit('joinOrderRoom', { orderId });
+    console.log(`📡 Dołączono do nasłuchiwania zamówienia: ${orderId}`);
+  }
+
+  // Metoda zwracająca strumień danych (Observable), gdy status się zmieni
+  onOrderStatus(): Observable<any> {
+    return new Observable(observer => {
+      this.socket.on('orderStatus', (data) => {
+        console.log('⚡ Otrzymano zmianę statusu:', data);
+        observer.next(data);
+      });
+    });
+  }
+
+  // Rozłączenie (np. przy wyjściu z komponentu)
+  disconnect() {
+    if (this.socket) {
+      this.socket.disconnect();
+    }
+  }
+
+  joinDeviceRoom(deviceId: string) {
+    this.socket.emit('joinDeviceRoom', { deviceId });
+    console.log(`📡 Kiosk dołączył do pokoju urządzenia: ${deviceId}`);
+  }
+
+  onPumpCommand(): Observable<any> {
+    return new Observable((observer) => {
+      this.socket.on('deviceCommand', (data: any) => {
+        console.log('⚡ Otrzymano komendę z serwera:', data);
+        
+        if (data.command === 'START_PUMP') {
+           observer.next(data);
+        }
+      });
+    });
+  }
+
+}
