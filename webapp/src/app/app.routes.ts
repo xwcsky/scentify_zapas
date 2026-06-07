@@ -11,10 +11,13 @@ import { DashboardComponent } from './admin/dashboard/dashboard';
 import { CouponsComponent } from './admin/coupons/coupons';
 import { DevicesComponent } from './admin/devices/devices';
 import { StatisticsComponent } from './admin/statistics/statistics';
+import { ServiceLandingComponent } from './service-landing/service-landing';
 
 export const routes: Routes = [
   // --- STREFY PUBLICZNE (Dostępne dla każdego) ---
   
+  // Nasz fake sklep
+  { path: '', component: ServiceLandingComponent, pathMatch: 'full', data: { breadcrumb: 'Konsultacja Olfaktoryczna' } },
   // 1. Ekran startowy 
   { path: 'shop', component: ShopComponent, data: { breadcrumb: 'Sklep' } },
   
